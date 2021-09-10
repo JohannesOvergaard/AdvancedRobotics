@@ -24,7 +24,7 @@ right_color = ColorSensor(Port.S3)
 center_color = ColorSensor(Port.S4)
 
 # Create your objects here
-base = DriveBase(left_motor, right_motor, 57, 155) 
+base = DriveBase(left_motor, right_motor, 57, 175) 
 #print(base.settings())
 #base.settings(132, 300, 50, 100) 
 # Write your program here
@@ -47,23 +47,23 @@ while (True):
     left_is_black = left_color.reflection() < threshold
     center_is_black = center_color.reflection() < threshold
 
-    if (left_is_black and not right_is_black) and center_is_black: # left turn
+    if (left_is_black and not right_is_black and center_is_black): # left turn - T-intersection
         base.turn(-10)
         base.straight(10)
         continue
 
-    if (right_is_black and not left_is_black and center_is_black): # right turn
+    if (right_is_black and not left_is_black and center_is_black): # right turn - T-intersection
         base.turn(10)
         base.straight(10)
         continue
 
-    if (left_is_black and not right_is_black and not center_is_black): # left turn
+    if (left_is_black and not right_is_black and not center_is_black): # left turn - Corner, adjustment
         while (not center_is_black):
             base.turn(-20)
             center_is_black = center_color.reflection() < threshold
         continue
 
-    if (right_is_black and not left_is_black and not center_is_black): # right turn
+    if (right_is_black and not left_is_black and not center_is_black): # right turn 
         while (not center_is_black):
             base.turn(20)
             center_is_black = center_color.reflection() < threshold
