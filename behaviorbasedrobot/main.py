@@ -42,7 +42,7 @@ def update_sensor_values():
 
  
 while (True):
-    base.drive(100, 0) 
+    base.drive(75, 0) 
     right_is_black = right_color.reflection() < threshold
     left_is_black = left_color.reflection() < threshold
     center_is_black = center_color.reflection() < threshold
@@ -59,33 +59,33 @@ while (True):
 
     if (left_is_black and not right_is_black and not center_is_black): # left turn - Corner, adjustment
         while (not center_is_black):
-            base.turn(-20)
+            base.turn(-15)
             center_is_black = center_color.reflection() < threshold
         continue
 
     if (right_is_black and not left_is_black and not center_is_black): # right turn 
         while (not center_is_black):
-            base.turn(20)
+            base.turn(15)
             center_is_black = center_color.reflection() < threshold
         continue
 
     if (left_is_black and right_is_black and not center_is_black): #T-intersection 
-        base.straight(40)
+        base.straight(65)
         if (random_left_right() == "left"):
-            base.turn(-90)
+            base.turn(-82)
             continue
         else:
-            base.turn(90)
+            base.turn(82)
             continue
 
     if (left_is_black and right_is_black and center_is_black): # normal intersection
         direction = random_dir()
-        base.straight(40)
+        base.straight(65)
         if (direction == "left"): 
-            base.turn(-90)
+            base.turn(-82)
             continue
         elif (direction == "right"):
-            base.turn(90)
+            base.turn(82)
             continue
         else :
             continue
