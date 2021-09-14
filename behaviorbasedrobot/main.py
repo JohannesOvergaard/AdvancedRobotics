@@ -6,12 +6,9 @@ from pybricks.robotics import DriveBase
 import random
 
 
-distance = 20
+straight_distance = 65
 threshold = 25 #threshold for determining if black or silver
-ninety_degree_turn = 540
-forthyfive_degree_turn = 270
-left_is_black = False
-right_is_black = False
+ninety_degree_turn = 84
 
 # Initialize the EV3 Brick.
 ev3 = EV3Brick()
@@ -34,60 +31,64 @@ def random_left_right():
 
 def random_dir():
     return random.choice(["left","right", "center"])
-
-def update_sensor_values():
-    right_is_black = right_color.reflection() < threshold
-    left_is_black = left_color.reflection() < threshold
-    center_is_black = center_color.reflection() < threshold
-
  
 while (True):
-    base.drive(75, 0) 
+    base.drive(130, 0) 
     right_is_black = right_color.reflection() < threshold
     left_is_black = left_color.reflection() < threshold
     center_is_black = center_color.reflection() < threshold
 
-    if (left_is_black and not right_is_black and center_is_black): # left turn - T-intersection
-        base.turn(-10)
-        base.straight(10)
-        continue
-
-    if (right_is_black and not left_is_black and center_is_black): # right turn - T-intersection
-        base.turn(10)
-        base.straight(10)
-        continue
-
-    if (left_is_black and not right_is_black and not center_is_black): # left turn - Corner, adjustment
-        while (not center_is_black):
-            base.turn(-15)
-            center_is_black = center_color.reflection() < threshold
-        continue
-
-    if (right_is_black and not left_is_black and not center_is_black): # right turn 
-        while (not center_is_black):
-            base.turn(15)
-            center_is_black = center_color.reflection() < threshold
-        continue
-
-    if (left_is_black and right_is_black and not center_is_black): #T-intersection 
-        base.straight(65)
-        if (random_left_right() == "left"):
-            base.turn(-82)
+    if (not center_is_black): #adjust direction
+        if (left_is_black): #adjust left
+            base.turn(-8)
             continue
-        else:
-            base.turn(82)
-            continue
-
-    if (left_is_black and right_is_black and center_is_black): # normal intersection
-        direction = random_dir()
-        base.straight(65)
-        if (direction == "left"): 
-            base.turn(-82)
-            continue
-        elif (direction == "right"):
-            base.turn(82)
-            continue
-        else :
+        if (right_is_black): #adjust right
+            base.turn(8)
             continue
     
-    #if (not left_is_black and not right_is_black and not center_is_black):
+    if (center_is_black and right_is_black and left_is_black): #T-intersection or X-intersection
+        base.straight(straight_distance)
+        center_is_black = center_color.reflection() < threshold
+        if (center_is_black): # X-intersection
+            direction = random_dir()
+            if (direction == "left"): 
+                base.turn(-ninety_degree_turn)
+                continue
+            elif (direction == "right"):
+                base.turn(ninety_degree_turn)
+                continue
+            else :
+                continue
+        else : # T-intersection
+            if (random_left_right() == "left"):
+                base.turn(-ninety_degree_turn)
+                continue
+            else:
+                base.turn(ninety_degree_turn)
+                continue
+    
+    if (center_is_black and not right_is_black and left_is_black): #path left
+        base.straight(straight_distance)
+        center_is_black = center_color.reflection() < threshold
+        if (not center_is_black): #Turn left
+            base.turn(-ninety_degree_turn)
+            continue
+        else: #Left of straight
+            if (random_left_right() == "left"):
+                base.turn(-ninety_degree_turn)
+                continue
+            else:
+                continue
+
+    if (center_is_black and right_is_black and not left_is_black): #path right
+        base.straight(straight_distance)
+        center_is_black = center_color.reflection() < threshold
+        if (not center_is_black): #Turn right
+            base.turn(ninety_degree_turn)
+            continue
+        else: #Left of straight
+            if (random_left_right() == "right"):
+                base.turn(ninety_degree_turn)
+                continue
+            else:
+                continue
