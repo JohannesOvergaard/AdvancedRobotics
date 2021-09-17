@@ -5,7 +5,7 @@ size = 0
 
 def init(board_string):
     global board, size
-    temp = filter(None, board_string.splitlines())
+    temp = list(filter(None, board_string.splitlines()))
     size = len(temp[0])
     map_get_fixed_elements = {' ':' ', '.': '.', '@':' ', '#':'#', '$':' ', '*':'.'}
     board =  [['' for i in range(size)] for j in range(size)]
@@ -20,8 +20,8 @@ def init(board_string):
             if character == '$' or character == '*':
                 can_positions.append((c,r))
     print('\n'.join([''.join(['{:2}'.format(item) for item in row]) for row in board]))
-    print robot_position
-    print can_positions
+    print(robot_position)
+    print(can_positions)
 
     queue = deque([(robot_position, can_positions, "")])
     visited = {(robot_position,str(can_positions))}
@@ -87,4 +87,4 @@ board = """
 #########"""
 
 queue, visited = init(board)
-print solve(queue, visited)
+print(solve(queue, visited))
