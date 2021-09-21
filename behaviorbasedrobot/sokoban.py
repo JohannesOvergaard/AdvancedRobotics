@@ -64,10 +64,10 @@ def solve(queue, visited):
                 new_can_pos = push_can(x, y, dx, dy, can_pos)
                 if new_can_pos and ((x,y),str(new_can_pos)) not in visited: #fail if not possible to move the can or tried before
                     if is_solved(new_can_pos): #check if the new position of the cans is a solution
-                        return moves + dir[3]
+                        return moves + dir[2]
                     else: #add the new position of bot and cans to the queue and to visited
                         visited.add(((x,y), str(new_can_pos)))
-                        queue.append(((x,y), new_can_pos, moves + dir[3]))
+                        queue.append(((x,y), new_can_pos, moves + dir[2]))
             else: #move to new position
                 if ((x,y), str(can_pos)) not in visited: #fail if move is tried before
                     #add the new position of bot to the queue and to visited
@@ -86,5 +86,22 @@ board = """
 #*      #
 #########"""
 
+def translate_solution(str):
+    solution = str.split()
+    route = ""
+    i = 0
+    while (i<=len(solution)):
+        if i == len(solution)-1:
+            break
+        if (solution[i] == solution[i+1]):
+            route = route + solution[i] + " " 
+            i = i+2
+        else:
+            route = route + solution[i] + " " 
+            i = i+1
+    return route + solution[len(solution)-1]
+
 queue, visited = init(board)
-print(solve(queue, visited))
+solution = solve(queue, visited)
+print(solution + '\n')
+print(translate_solution(solution) + '\n')
