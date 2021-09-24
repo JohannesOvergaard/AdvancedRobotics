@@ -29,15 +29,15 @@ forward
 
 straight_distance = 55
 backward_distance = -125
-threshold = 13 #threshold for determining if black or silver
+threshold = 15 #threshold for determining if black or silver
 ninety_degree_turn = 84
 ROBOT_ORIENT = ""
-INSTRUCTION_STRING = "down down down right right right left up left left right up up down left up right right right"
+INSTRUCTION_STRING = "up up left left up down right up left left right down down up left down right right"
 QUEUE_COUNTER = 1
 
 # Initialize the EV3 Brick.
 ev3 = EV3Brick()
-
+ev3.speaker.set_volume(100, which='_all_')
 
 # Initialize a motor at port B & C.
 left_motor = Motor(Port.B)
@@ -125,28 +125,32 @@ def DEBUG_PRINT(dir, orient, instr_num):
     print("ORIENTATION: "+ orient)
     print("INSTRUCTION NUMBER: "+str(instr_num)+"\n")
 
-def DRIVE_IN_DIRECTION(dir):
-    if dir == "left":
-        base.straight(straight_distance)
+def PANIC():
+    ev3.speaker.say("PANIC MODE ENGAGED")
+    while(True):
+        time.sleep(1)
+        ev3.speaker.say("HELP ME")
+
+def DRIVE_IN_DIRECTION(dir, left, center, right):
+    if dir == "left" and left:
         base.turn(-ninety_degree_turn)
-        base.straight(straight_distance/2)
-    elif dir == "right":
-        base.straight(straight_distance)
+        base.straight(0.4 * straight_distance)
+    elif dir == "right" and right:
         base.turn(ninety_degree_turn)
-        base.straight(straight_distance/2)
+        base.straight(0.4 * straight_distance)
     elif dir == "backward":
         base.straight(backward_distance)
         base.turn(ninety_degree_turn*2)
-    elif dir == "forward":
+    elif dir == "forward" and center:
         base.straight(straight_distance)
-
-
+    else:
+        PANIC()
 
 ev3.speaker.say("MODERATE INTEREST ENGAGED")
 QUEUE = create_instruction_queue(INSTRUCTION_STRING)
 
 while (True):
-    base.drive(200, 0) 
+    base.drive(132, 0) 
     right_is_black = right_color.reflection() < threshold
     left_is_black = left_color.reflection() < threshold
     center_is_black = center_color.reflection() < threshold
@@ -160,7 +164,13 @@ while (True):
             continue
 
     if (center_is_black and (right_is_black or left_is_black)):
+        base.straight(0.2 * straight_distance)
+        right_is_black = right_color.reflection() < threshold
+        left_is_black = left_color.reflection() < threshold
+        base.straight(0.8 * straight_distance)
+        center_is_black = center_color.reflection() < threshold
+
         direction = translate_dir(QUEUE[QUEUE_COUNTER])
         DEBUG_PRINT(direction, ROBOT_ORIENT, QUEUE_COUNTER)
         QUEUE_COUNTER += 1
-        DRIVE_IN_DIRECTION(direction)
+        DRIVE_IN_DIRECTION(direction, left_is_black, center_is_black, right_is_black)

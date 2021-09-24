@@ -7,7 +7,7 @@ def init(board_string):
     global board, size
     temp = list(filter(None, board_string.splitlines()))
     size = len(temp[0])
-    map_get_fixed_elements = {' ':' ', '.': '.', '@':' ', '#':'#', '$':' ', '*':'.'}
+    map_get_fixed_elements = {' ':' ', '.': '.', '@':' ', 'X':'#', '$':' ', '*':'.'}
     board =  [['' for i in range(size)] for j in range(size)]
     robot_position = ()
     can_positions = []
@@ -76,15 +76,15 @@ def solve(queue, visited):
     return "No solution"
 
 board = """
-#########
-#.      #
-# #$# # #
-#       #
-# #$# # #
-#    .  #
-# # # # #
-#*      #
-#########"""
+XXXXXXXXX
+X@     .X
+X X X X X
+X  $    X
+X X X X X
+X. $    X
+X X X X X
+X  $   .X
+XXXXXXXXX"""
 
 def translate_solution(str):
     solution = str.split()
