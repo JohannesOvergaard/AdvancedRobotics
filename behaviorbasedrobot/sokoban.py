@@ -1,4 +1,5 @@
 from collections import deque
+import time
 
 board = []
 size = 0
@@ -7,7 +8,7 @@ def init(board_string):
     global board, size
     temp = list(filter(None, board_string.splitlines()))
     size = len(temp[0])
-    map_get_fixed_elements = {' ':' ', '.': '.', '@':' ', 'X':'#', '$':' ', '*':'.'}
+    map_get_fixed_elements = {' ':' ', '.': '.', '@':' ', '+':' ', 'X':'#', '#':'#', '$':' ', '*':'.'}
     board =  [['' for i in range(size)] for j in range(size)]
     robot_position = ()
     can_positions = []
@@ -15,13 +16,13 @@ def init(board_string):
     for r, row in enumerate(temp):
         for c, character in enumerate(row):
             board[r][c] = map_get_fixed_elements[character] 
-            if character == '@':
+            if character == '@' or character == '+':
                 robot_position = (c,r)
             if character == '$' or character == '*':
                 can_positions.append((c,r))
-    print('\n'.join([''.join(['{:2}'.format(item) for item in row]) for row in board]))
-    print(robot_position)
-    print(can_positions)
+    #print('\n'.join([''.join(['{:2}'.format(item) for item in row]) for row in board]))
+    #print(robot_position)
+    #print(can_positions)
 
     queue = deque([(robot_position, can_positions, "")])
     visited = {(robot_position,str(can_positions))}
@@ -76,15 +77,13 @@ def solve(queue, visited):
     return "No solution"
 
 board = """
-XXXXXXXXX
-X@     .X
-X X X X X
-X  $    X
-X X X X X
-X. $    X
-X X X X X
-X  $   .X
-XXXXXXXXX"""
+#######
+#.    #
+#$* # #
+#.  $*#
+# .$  #
+#@ *  #
+#######"""
 
 def translate_solution(str):
     solution = str.split()
@@ -101,7 +100,10 @@ def translate_solution(str):
             i = i+1
     return route + solution[len(solution)-1]
 
+start_time = time.time()
 queue, visited = init(board)
 solution = solve(queue, visited)
+print("--- %s seconds ---" % (time.time() - start_time))
 print(solution + '\n')
-print(translate_solution(solution) + '\n')
+print(len(solution.split()))
+#print(translate_solution(solution) + '\n')
