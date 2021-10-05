@@ -68,19 +68,19 @@ for cnt in range(5000):
     distance4 = sqrt((s4.x-x)**2+(s4.y-y)**2)                    # distance to wall
     
     #simple controller - change direction of wheels every 10 seconds (100*robot_timestep) unless close to wall then turn on spot
-    if (distance2 < 0.15):
-        left_wheel_velocity = -1
-        right_wheel_velocity = 1
-    elif (distance0 < 0.15 or distance1 < 0.15):
-        left_wheel_velocity = 0.4
-        right_wheel_velocity = -0.4
-    elif (distance3 < 0.15 or distance4 < 0.15):
-        left_wheel_velocity = -0.4
-        right_wheel_velocity = 0.4
+    if (distance2 < 0.07):
+        left_wheel_velocity = -random()
+        right_wheel_velocity = -random()
+    elif (distance0 < 0.07 or distance1 < 0.07):
+        left_wheel_velocity = 0.5
+        right_wheel_velocity = -0.5
+    elif (distance3 < 0.07 or distance4 < 0.07):
+        left_wheel_velocity = -0.5
+        right_wheel_velocity = 0.5
     else:                
         if cnt%100==0:
-            left_wheel_velocity = 1#random()
-            right_wheel_velocity = 1#random()
+            left_wheel_velocity = random()
+            right_wheel_velocity = random()
         
     #step simulation
     simulationstep()
