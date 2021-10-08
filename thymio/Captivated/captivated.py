@@ -11,6 +11,7 @@ import dbus
 import dbus.mainloop.glib
 from threading import Thread
 
+
 class Thymio:
     def __init__(self):
         self.aseba = self.setup()
@@ -95,6 +96,7 @@ def mainLoop(robot):
     count = 1
     left_wheel_velocity = 0
     right_wheel_velocity = 0 
+    min_distance_wall = 70
     while count < 10000:
         prox_val = robot.sens_val()
         s0_dist = robot.convert_sensor_value_to_distance(prox_val[0], "s0")
@@ -103,13 +105,14 @@ def mainLoop(robot):
         s3_dist = robot.convert_sensor_value_to_distance(prox_val[3], "s3")
         s4_dist = robot.convert_sensor_value_to_distance(prox_val[4], "s4")
 
-        if (s2_dist < 70):
+        if (s2_dist < min_distance_wall):
             left_wheel_velocity = random.randrange(200, 400)
             right_wheel_velocity = -random.randrange(200, 400)
-        elif (s0_dist < 70 or s1_dist < 70):
+        elif (s0_dist < min_distance_wall or s1_dist < min_distance_wall):
+            
             left_wheel_velocity = 200
             right_wheel_velocity = -200
-        elif (s3_dist < 70 or s4_dist < 70):
+        elif (s3_dist < min_distance_wall or s4_dist < min_distance_wall):
             left_wheel_velocity = -200
             right_wheel_velocity = 200
         else:                

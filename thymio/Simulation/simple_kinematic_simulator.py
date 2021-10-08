@@ -26,6 +26,8 @@ x = 0.0   # robot position in meters - x direction - positive to the right
 y = 0.0   # robot position in meters - y direction - positive up
 q = 0.0   # robot heading with respect to x-axis in radians 
 
+min_distance_wall = 0.07 #in meters
+
 left_wheel_velocity =  random()   # robot left wheel velocity in radians/s
 right_wheel_velocity =  random()  # robot right wheel velocity in radians/s
 
@@ -61,20 +63,20 @@ for cnt in range(5000):
     s2 = world.intersection(ray_2)
     s3 = world.intersection(ray_3)
     s4 = world.intersection(ray_4)
-    distance0 = sqrt((s0.x-x)**2+(s0.y-y)**2)
-    distance1 = sqrt((s1.x-x)**2+(s1.y-y)**2)
-    distance2 = sqrt((s2.x-x)**2+(s2.y-y)**2)
-    distance3 = sqrt((s3.x-x)**2+(s3.y-y)**2)
-    distance4 = sqrt((s4.x-x)**2+(s4.y-y)**2)                    # distance to wall
+    s0_dist = sqrt((s0.x-x)**2+(s0.y-y)**2)
+    s1_dist = sqrt((s1.x-x)**2+(s1.y-y)**2)
+    s2_dist = sqrt((s2.x-x)**2+(s2.y-y)**2)
+    s3_dist = sqrt((s3.x-x)**2+(s3.y-y)**2)
+    s4_dist = sqrt((s4.x-x)**2+(s4.y-y)**2)                    # distance to wall
     
     #simple controller - change direction of wheels every 10 seconds (100*robot_timestep) unless close to wall then turn on spot
-    if (distance2 < 0.07):
-        left_wheel_velocity = -random()
+    if (s2_dist < min_distance_wall):
+        left_wheel_velocity = random()
         right_wheel_velocity = -random()
-    elif (distance0 < 0.07 or distance1 < 0.07):
+    elif (s0_dist < min_distance_wall or s1_dist < min_distance_wall):
         left_wheel_velocity = 0.5
         right_wheel_velocity = -0.5
-    elif (distance3 < 0.07 or distance4 < 0.07):
+    elif (s3_dist < min_distance_wall or s4_dist < min_distance_wall):
         left_wheel_velocity = -0.5
         right_wheel_velocity = 0.5
     else:                
