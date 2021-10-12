@@ -2,6 +2,30 @@ import shapely
 from shapely.geometry import LinearRing, LineString, Point
 from numpy import sin, cos, pi, sqrt
 from random import random
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib import style
+
+# style.use('fivethirtyeight')
+
+# fig = plt.figure()
+# ax1 = fig.add_subplot(1,1,1)
+
+# def animate(i):
+#     graph_data = open('example.txt','r').read()
+#     lines = graph_data.split('\n')
+#     xs = []
+#     ys = []
+#     for line in lines:
+#         if len(line) > 1:
+#             x, y = line.split(',')
+#             xs.append(float(x))
+#             ys.append(float(y))
+#     ax1.clear()
+#     ax1.plot(xs, ys)
+
+# ani = animation.FuncAnimation(fig, animate, interval=1000)
+# plt.show()
 
 # A prototype simulation of a differential-drive robot with one sensor
 
@@ -51,6 +75,10 @@ def simulationstep():
 #################
 file = open("trajectory.dat", "w")
 
+cm = 1/2.54
+fig, ax = plt.subplots(figsize=(20*cm, 20*cm))
+ax.axis([-W, W, -H, H])
+
 for cnt in range(5000):
     #simple single-ray sensor
     ray_0 = LineString([(x, y), (x+cos(q+0.7)*2*W,(y+sin(q+0.7)*2*H)) ])
@@ -98,5 +126,16 @@ for cnt in range(5000):
         #file.write( str(x) + ", " + str(y) + ", " + str(cos(q+0.35)*0.05) + ", " + str(sin(q+0.35)*0.05) + "\n")
         #file.write( str(x) + ", " + str(y) + ", " + str(cos(q+0.7)*0.05) + ", " + str(sin(q+0.7)*0.05) + "\n")
 
+        # Animate live robots calculated location in sim
+        # ax.quiver(x, y, cos(q)*0.05, sin(q-0.7)*0.05) #s0
+        # ax.quiver(x, y, cos(q)*0.05, sin(q-0.35)*0.05) #s1
+        ax.quiver(x, y, cos(q)*0.05, sin(q)*0.05, width=0.005) #s2
+        # ax.quiver(x, y, cos(q)*0.05, sin(q+0.35)*0.05) #s3
+        # ax.quiver(x, y, cos(q)*0.05, sin(q+0.7)*0.05) #s4
+
+        plt.draw() 
+        plt.pause(0.01) #is necessary for the plot to update for some reason
+
 file.close()
+sleep(500)
     
