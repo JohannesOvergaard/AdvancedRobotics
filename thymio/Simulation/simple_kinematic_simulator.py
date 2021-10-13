@@ -1,10 +1,10 @@
 import shapely
 from shapely.geometry import LinearRing, LineString, Point
 from numpy import sin, cos, pi, sqrt
-from random import random
+from random import random, uniform
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from matplotlib import style
+import math
+from matplotlib.patches import Rectangle
 
 # style.use('fivethirtyeight')
 
@@ -46,14 +46,33 @@ world = LinearRing([(W/2,H/2),(-W/2,H/2),(-W/2,-H/2),(W/2,-H/2)])
 # Variables 
 ###########
 
-x = 0.0   # robot position in meters - x direction - positive to the right 
-y = 0.0   # robot position in meters - y direction - positive up
-q = 0.0   # robot heading with respect to x-axis in radians 
+x = 0.0     # robot position in meters - x direction - positive to the right 
+y = 0.0     # robot position in meters - y direction - positive up
+q = 0.0     # robot heading with respect to x-axis in radians 
 
 min_distance_wall = 0.07 #in meters
 
 left_wheel_velocity =  random()   # robot left wheel velocity in radians/s
 right_wheel_velocity =  random()  # robot right wheel velocity in radians/s
+
+def getLaserScans(resolution=10):
+    full_scan = []
+    
+    # fhere we emulate the lidar
+    for i in range(resolution+1):
+        added_angle = i * ((2*math.pi)/resolution)
+        current_angle = (q + added_angle) % (2*math.pi)
+        ray = LineString([(x, y), (x+cos(current_angle)*10,(y+sin(current_angle)*10)) ])
+        s = world.intersection(ray)
+        
+        # the individual ray distances is what would get from your lidar sensors
+        distance = sqrt((s.x-x)**2+(s.y-y)**2)
+        
+        #here the intersect coords are calculated using the current angle and the measured distance
+        x_coord = x + math.cos(current_angle) * distance
+        y_coord = y + math.sin(current_angle) * distance 
+        full_scan.append((float(x_coord), float(y_coord))) #
+    return full_scan
 
 # Kinematic model
 #################
@@ -76,10 +95,15 @@ def simulationstep():
 file = open("trajectory.dat", "w")
 
 cm = 1/2.54
-fig, ax = plt.subplots(figsize=(20*cm, 20*cm))
-ax.axis([-W, W, -H, H])
+fig, ax = plt.subplots(figsize=(W*20*cm, H*20*cm))
+ax.axis([-W/2-0.5, W/2+0.5, -H/2-0.5, H/2+0.5])
+ax.add_patch( Rectangle((-W/2, -H/2),
+                        W, H,
+                        fc ='none', 
+                        ec ='g',
+                        lw = 3) )
 
-for cnt in range(5000):
+for cnt in range(3000):
     #simple single-ray sensor
     ray_0 = LineString([(x, y), (x+cos(q+0.7)*2*W,(y+sin(q+0.7)*2*H)) ])
     ray_1 = LineString([(x, y), (x+cos(q+0.35)*2*W,(y+sin(q+0.35)*2*H)) ])
@@ -133,9 +157,13 @@ for cnt in range(5000):
         # ax.quiver(x, y, cos(q)*0.05, sin(q+0.35)*0.05) #s3
         # ax.quiver(x, y, cos(q)*0.05, sin(q+0.7)*0.05) #s4
 
+        [ax.plot(x,y, 'bo') for (x,y) in getLaserScans()] 
         plt.draw() 
         plt.pause(0.01) #is necessary for the plot to update for some reason
 
 file.close()
-sleep(500)
-    
+#[ax.plot(x,y, 'bo') for (x,y) in getLaserScans()] 
+ax.plot(x,y, "ro")
+plt.draw()
+plt.show(block=True)
+
