@@ -1,9 +1,8 @@
 import shapely
 from shapely.geometry import LinearRing, LineString, Point
-from numpy import sin, cos, pi, sqrt
-from random import random, uniform
+from numpy import sin, cos, pi, sqrt, array
+from random import random
 import matplotlib.pyplot as plt
-import math
 from matplotlib.patches import Rectangle
 
 # style.use('fivethirtyeight')
@@ -43,6 +42,9 @@ simulation_timestep = 0.01  # timestep in kinematics sim (probably don't touch..
 # the world is a rectangular arena with width W and height H
 world = LinearRing([(W/2,H/2),(-W/2,H/2),(-W/2,-H/2),(W/2,-H/2)])
 
+belief = array([1/10]*10)
+print(belief)
+
 # Variables 
 ###########
 
@@ -60,17 +62,17 @@ def getLaserScans(resolution=10):
     
     # fhere we emulate the lidar
     for i in range(resolution+1):
-        added_angle = i * ((2*math.pi)/resolution)
-        current_angle = (q + added_angle) % (2*math.pi)
-        ray = LineString([(x, y), (x+cos(current_angle)*10,(y+sin(current_angle)*10)) ])
+        added_angle = i * ((2*pi)/resolution)
+        current_angle = (q + added_angle) % (2*pi)
+        ray = LineString([(x, y), (x+cos(current_angle)*(W+H),(y+sin(current_angle)*(W+H))) ])
         s = world.intersection(ray)
         
         # the individual ray distances is what would get from your lidar sensors
         distance = sqrt((s.x-x)**2+(s.y-y)**2)
         
         #here the intersect coords are calculated using the current angle and the measured distance
-        x_coord = x + math.cos(current_angle) * distance
-        y_coord = y + math.sin(current_angle) * distance 
+        x_coord = x + cos(current_angle) * distance
+        y_coord = y + sin(current_angle) * distance 
         full_scan.append((float(x_coord), float(y_coord))) #
     return full_scan
 
@@ -105,11 +107,11 @@ ax.add_patch( Rectangle((-W/2, -H/2),
 
 for cnt in range(3000):
     #simple single-ray sensor
-    ray_0 = LineString([(x, y), (x+cos(q+0.7)*2*W,(y+sin(q+0.7)*2*H)) ])
-    ray_1 = LineString([(x, y), (x+cos(q+0.35)*2*W,(y+sin(q+0.35)*2*H)) ])
-    ray_2 = LineString([(x, y), (x+cos(q)*2*W,(y+sin(q)*2*H)) ])
-    ray_3 = LineString([(x, y), (x+cos(q-0.35)*2*W,(y+sin(q-0.35)*2*H)) ])
-    ray_4 = LineString([(x, y), (x+cos(q-0.7)*2*W,(y+sin(q-0.7)*2*H)) ])  # a line from robot to a point outside arena in direction of q
+    ray_0 = LineString([(x, y), (x+cos(q+0.7)*(W+H),(y+sin(q+0.7)*(W+H))) ])
+    ray_1 = LineString([(x, y), (x+cos(q+0.35)*(W+H),(y+sin(q+0.35)*(W+H))) ])
+    ray_2 = LineString([(x, y), (x+cos(q)*(W+H),(y+sin(q)*(W+H))) ])
+    ray_3 = LineString([(x, y), (x+cos(q-0.35)*(W+H),(y+sin(q-0.35)*(W+H))) ])
+    ray_4 = LineString([(x, y), (x+cos(q-0.7)*(W+H),(y+sin(q-0.7)*(W+H))) ])  # a line from robot to a point outside arena in direction of q
     s0 = world.intersection(ray_0)
     s1 = world.intersection(ray_1)
     s2 = world.intersection(ray_2)
@@ -157,7 +159,7 @@ for cnt in range(3000):
         # ax.quiver(x, y, cos(q)*0.05, sin(q+0.35)*0.05) #s3
         # ax.quiver(x, y, cos(q)*0.05, sin(q+0.7)*0.05) #s4
 
-        [ax.plot(x,y, 'bo') for (x,y) in getLaserScans()] 
+        #[ax.plot(x,y, 'bo') for (x,y) in getLaserScans()] 
         plt.draw() 
         plt.pause(0.01) #is necessary for the plot to update for some reason
 
