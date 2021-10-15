@@ -1,7 +1,8 @@
 import shapely
 from shapely.geometry import LinearRing, LineString, Point
-from numpy import sin, cos, pi, sqrt, array
-from random import random
+from numpy import sin, cos, pi, sqrt
+import numpy as np
+from random import random, uniform
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
@@ -35,6 +36,8 @@ L = 0.093  # distance between wheels in meters
 
 W = 1.92  # width of arena
 H = 1.14  # height of arena
+Wcm = round(W*100)
+Hcm = round(H*100)
 
 robot_timestep = 0.1        # 1/robot_timestep equals update frequency of robot
 simulation_timestep = 0.01  # timestep in kinematics sim (probably don't touch..)
@@ -42,14 +45,10 @@ simulation_timestep = 0.01  # timestep in kinematics sim (probably don't touch..
 # the world is a rectangular arena with width W and height H
 world = LinearRing([(W/2,H/2),(-W/2,H/2),(-W/2,-H/2),(W/2,-H/2)])
 
-belief = array([1/10]*10)
-print(belief)
-
 # Variables 
 ###########
-
-x = 0.0     # robot position in meters - x direction - positive to the right 
-y = 0.0     # robot position in meters - y direction - positive up
+x = uniform(-W/2,W/2)     # robot position in meters - x direction - positive to the right 
+y = uniform(-H/2,H/2)     # robot position in meters - y direction - positive up
 q = 0.0     # robot heading with respect to x-axis in radians 
 
 min_distance_wall = 0.07 #in meters
@@ -57,7 +56,21 @@ min_distance_wall = 0.07 #in meters
 left_wheel_velocity =  random()   # robot left wheel velocity in radians/s
 right_wheel_velocity =  random()  # robot right wheel velocity in radians/s
 
-def getLaserScans(resolution=10):
+#  Bayesian filter
+##################
+#initialize belief
+cell_size = 2
+belief = np.array([[1/((Wcm/cell_size)*(Hcm/cell_size))]*int(Wcm/cell_size)]*int(Hcm/cell_size))
+print(belief)
+print(f' Size: {belief.size} \n Width: {belief.size/(Hcm/cell_size)} \n Height: {belief.size/(Wcm/cell_size)}')
+print((sum(sum(belief))))
+
+#map
+map = np.array([[0]*int(Wcm/cell_size)]*int(Hcm/cell_size))
+
+# Laser Scan
+############
+def getLaserScans(resolution=360):
     full_scan = []
     
     # fhere we emulate the lidar
@@ -105,7 +118,7 @@ ax.add_patch( Rectangle((-W/2, -H/2),
                         ec ='g',
                         lw = 3) )
 
-for cnt in range(3000):
+for cnt in range(1000):
     #simple single-ray sensor
     ray_0 = LineString([(x, y), (x+cos(q+0.7)*(W+H),(y+sin(q+0.7)*(W+H))) ])
     ray_1 = LineString([(x, y), (x+cos(q+0.35)*(W+H),(y+sin(q+0.35)*(W+H))) ])
