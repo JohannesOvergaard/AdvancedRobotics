@@ -95,9 +95,9 @@ def laserScanToPosition(scan):
     min_dist = round(min(scan),3)
     min_index = np.argmin(scan)
     #print(f'Minimum: Distance: {min_dist}, Index: {min_index}')
-    right_dist = round(scan[(min_index+45)%resolution],3)
+    right_dist = round(scan[(min_index+round(resolution/4))%resolution],3)
     #print(f'Right: Distance: {right_dist}, Index: {(min_index+90)%resolution}')
-    left_dist = round(scan[(min_index-45)%resolution],3)
+    left_dist = round(scan[(min_index-round(resolution/4))%resolution],3)
     #print(f'Left: Distance: {left_dist}, Index: {(min_index-90)%resolution}')
     full_side = right_dist + left_dist
     if (W-0.05 < full_side and full_side < W+0.05):
