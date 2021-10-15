@@ -3,18 +3,96 @@ import os
 # initialize asebamedulla in background and wait 0.3s to let
 # asebamedulla startup
 os.system("(asebamedulla ser:name=Thymio-II &) && sleep 0.3")
+import numpy as np
 import matplotlib.pyplot as plt
 from time import sleep
 import random
+import cv2
 import sys
 import dbus
+from math import cos, sin, pi, floor
 import dbus.mainloop.glib
+from adafruit_rplidar import RPLidar
 from threading import Thread
+from picamera import PiCamera
 
+# PROGRAM VARIABLES 
+DEBUG = True
+
+#signal scanning thread to exit
+exit_now = False
+
+# Setup the RPLidar
+PORT_NAME = '/dev/ttyUSB0'
+lidar = RPLidar(None, PORT_NAME)
+#This is where we store the lidar readings
+scan_data = [0]*360
+
+#NOTE: if you get adafruit_rplidar.RPLidarException: Incorrect descriptor starting bytes
+# try disconnecting the usb cable and reconnect again. That should fix the issue
+
+def lidarScan():
+    global scan_data
+    print("Starting background lidar scanning")
+    for scan in lidar.iter_scans():
+        if(exit_now):
+            return
+        for (_, angle, distance) in scan:
+            scan_data[min([359, floor(angle)])] = distance
+
+scanner_thread = Thread(target=lidarScan)
+scanner_thread.daemon = True
+scanner_thread.start()
+
+sleep(1)
+# Take photo
+camera = PiCamera()
+
+image = np.empty((240, 320, 3), dtype=np.uint8)
+
+def takePhotos():
+    global image
+    camera.start_preview()
+    while not exit_now:
+        print("Camera test")
+        # sleep(5)
+        #we capture to openCV compatible format
+        #you might want to increase resolution
+        camera.resolution = (320, 240)
+        camera.framerate = 24
+        sleep(2)
+        image = np.empty((240, 320, 3), dtype=np.uint8)
+        camera.capture(image, 'bgr')
+        cv2.imwrite('image_output.png', image) 
+    camera.stop_preview()
+
+camera_thread = Thread(target=takePhotos)
+camera_thread.daemon = True
+camera_thread.start()
+
+# def lidarScan():
+#     print("Starting background lidar scanning")
+#     test = lidar.iter_scans()
+#     # print(f"Length of scan: {len(test)}")
+#     for scan in test:
+#         if(exit_now):
+#             return
+#         if DEBUG:
+#             print(f"Length of scan: {len(scan)}")
+#         for (_, angle, distance) in scan:
+#             # if DEBUG:
+#             #     print(f"Angle:{angle} Distance:{distance}")
+#             scan_data[min([359, floor(angle)])] = distance
+#     print(finished)
+#     return scan_data
 
 class Thymio:
     def __init__(self):
+        PORT_NAME = '/dev/ttyUSB0'
+
         self.aseba = self.setup()
+        #self.camera = PiCamera()
+        #self.lidar = RPLidar(None, PORT_NAME)
 
     def drive(self, left_wheel_speed, right_wheel_speed):
         print("Left_wheel_speed: " + str(left_wheel_speed))
@@ -40,8 +118,36 @@ class Thymio:
             print(prox_horizontal[3])
             print(prox_horizontal[4])
 
-    def sens_val(self):
+    def sens_horizontal(self):
         return self.aseba.GetVariable("thymio-II", "prox.horizontal")
+
+    def sens_vertical(self):
+        return self.aseba.GetVariable("thymio-II", "prox.ground.reflected")
+
+    # def do_lidar_scan(self):
+    #     scan_data = scan_data = [0]*360
+    #     for scan in self.lidar.iter_scans():
+    #         if(exit_now):
+    #             return
+    #         for (_, angle, distance) in scan:
+    #             scan_data[min([359, floor(angle)])] = distance     
+    #     return scan_data
+        
+    # def take_photo(self, count):
+    #     print("Camera test")
+    #     self.camera.start_preview()
+    #     sleep(2)
+    #     #we capture to openCV compatible format
+    #     #you might want to increase resolution
+    #     self.camera.resolution = (320, 240)
+    #     self.camera.framerate = 24
+    #     sleep(2)
+    #     image = np.empty((240, 320, 3), dtype=np.uint8)
+    #     self.camera.capture(image, 'bgr')
+    #     cv2.imwrite(f'Thymio_image_{count}.png', image)
+    #     self.camera.stop_preview()
+    #     print("saved image to out.png")
+
 
 ############## Bus and aseba setup ######################################
 
@@ -93,12 +199,19 @@ class Thymio:
 #------------------- loop ------------------------
 
 def mainLoop(robot):
+    global scan_data
     count = 1
     left_wheel_velocity = 0
     right_wheel_velocity = 0 
     min_distance_wall = 70
-    while count < 10000:
-        prox_val = robot.sens_val()
+    while count < 1000:
+        prox_val = robot.sens_horizontal()
+        light_sensor_val = robot.sens_vertical()
+        robot.take_photo(count)
+        print(scan_data)
+        if DEBUG:
+            print(f"Left light: {light_sensor_val[0]}   and    Right light: {light_sensor_val[1]}")
+
         s0_dist = robot.convert_sensor_value_to_distance(prox_val[0], "s0")
         s1_dist = robot.convert_sensor_value_to_distance(prox_val[1], "s1")
         s2_dist = robot.convert_sensor_value_to_distance(prox_val[2], "s2")
@@ -109,7 +222,6 @@ def mainLoop(robot):
             left_wheel_velocity = random.randrange(200, 400)
             right_wheel_velocity = -random.randrange(200, 400)
         elif (s0_dist < min_distance_wall or s1_dist < min_distance_wall):
-            
             left_wheel_velocity = 200
             right_wheel_velocity = -200
         elif (s3_dist < min_distance_wall or s4_dist < min_distance_wall):
@@ -144,7 +256,7 @@ if __name__ == '__main__':
         '''
         mainLoop(robot)
     except:
-        print(sys.exc_info()[1])
+        print(f"{sys.exc_info()[0]}: {sys.exc_info()[1]}")
         print("Stopping robot")
         exit_now = True
         sleep(1)
