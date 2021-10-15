@@ -42,15 +42,15 @@ robot_timestep = 0.1        # 1/robot_timestep equals update frequency of robot
 simulation_timestep = 0.01  # timestep in kinematics sim (probably don't touch..)
 
 # the world is a rectangular arena with width W and height H
-world = LinearRing([(W/2,H/2),(-W/2,H/2),(-W/2,-H/2),(W/2,-H/2)])
+world = LinearRing([(W,H),(0,H),(0,0),(W,0)])
 
 # Variables 
 ###########
 min_distance_wall = 0.07   #in meters
 resolution = 180           #Angels in one round of the lidar
 
-x = uniform(min_distance_wall-W/2,W/2-min_distance_wall)     # robot position in meters - x direction - positive to the right 
-y = uniform(min_distance_wall-H/2,H/2-min_distance_wall)     # robot position in meters - y direction - positive up
+x = uniform(min_distance_wall,W-min_distance_wall)     # robot position in meters - x direction - positive to the right 
+y = uniform(min_distance_wall,H-min_distance_wall)     # robot position in meters - y direction - positive up
 q = uniform(0.0,2*pi)    # robot heading with respect to x-axis in radians 
 
 left_wheel_velocity =  random()   # robot left wheel velocity in radians/s
@@ -95,9 +95,9 @@ def laserScanToPosition(scan):
     min_dist = round(min(scan),3)
     min_index = np.argmin(scan)
     #print(f'Minimum: Distance: {min_dist}, Index: {min_index}')
-    right_dist = round(scan[(min_index+90)%resolution],3)
+    right_dist = round(scan[(min_index+45)%resolution],3)
     #print(f'Right: Distance: {right_dist}, Index: {(min_index+90)%resolution}')
-    left_dist = round(scan[(min_index-90)%resolution],3)
+    left_dist = round(scan[(min_index-45)%resolution],3)
     #print(f'Left: Distance: {left_dist}, Index: {(min_index-90)%resolution}')
     full_side = right_dist + left_dist
     if (W-0.05 < full_side and full_side < W+0.05):
@@ -105,11 +105,26 @@ def laserScanToPosition(scan):
     else:
         nearest_side = "West/East"
     #print(nearest_side)
-    return min_index, min_dist
+    return min_index, min_dist, right_dist
 
     #We know distance to the nearest wall and wether it is a north/south or a east/west side.
     #Further, we know the distance to the walls 90 degrees to left and right.
     #The orientation of the robot can be found by looking at the index zero of the scan and comparing it to the index of the minimum distance to a wall
+
+def orientationToPosition(orientation, min_dist, rigth_dist):
+    if (orientation == "East"):
+        xx = W-min_dist
+        yy = rigth_dist
+    elif (orientation == "North"):
+        xx = W-rigth_dist
+        yy = H-min_dist
+    elif (orientation == "West"):
+        xx = min_dist
+        yy = H-rigth_dist
+    elif (orientation == "South"):
+        xx = rigth_dist
+        yy = min_dist
+    return xx,yy
 
 def getOrientation():
     #Check AprilTag
@@ -150,8 +165,8 @@ file = open("trajectory.dat", "w")
 
 cm = 1/2.54
 fig, ax = plt.subplots(figsize=(W*20*cm, H*20*cm))
-ax.axis([-W/2-0.5, W/2+0.5, -H/2-0.5, H/2+0.5])
-ax.add_patch( Rectangle((-W/2, -H/2),
+ax.axis([0-0.1, W+0.1, 0-0.1, H+0.1])
+ax.add_patch( Rectangle((0, 0),
                         W, H,
                         fc ='none', 
                         ec ='g',
@@ -178,7 +193,7 @@ for cnt in range(1000):
     
     #simple controller - change direction of wheels every 10 seconds (100*robot_timestep) unless close to wall then turn on spot
     if not is_position_known:
-        min_index, min_dist = laserScanToPosition(getLaserScans())
+        min_index, min_dist, rigth_dist = laserScanToPosition(getLaserScans())
         if(min_index>0):
             left_wheel_velocity = 0.5
             right_wheel_velocity = -0.5
@@ -188,6 +203,8 @@ for cnt in range(1000):
             orientation = getOrientation()
             if not orientation is None:
                 print(orientation)
+                xx, yy = orientationToPosition(orientation, min_dist, rigth_dist)
+                print (f'x: {xx}, y: {yy}')
                 is_position_known = True
     else:
         break  
