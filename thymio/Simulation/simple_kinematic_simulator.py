@@ -1,4 +1,3 @@
-import shapely
 from shapely.geometry import LinearRing, LineString, Point
 from numpy import sin, cos, pi, sqrt
 import numpy as np
@@ -47,11 +46,11 @@ world = LinearRing([(W/2,H/2),(-W/2,H/2),(-W/2,-H/2),(W/2,-H/2)])
 
 # Variables 
 ###########
-x = uniform(-W/2,W/2)     # robot position in meters - x direction - positive to the right 
-y = uniform(-H/2,H/2)     # robot position in meters - y direction - positive up
-q = 0.0     # robot heading with respect to x-axis in radians 
-
 min_distance_wall = 0.07 #in meters
+
+x = uniform(min_distance_wall-W/2,W/2-min_distance_wall)     # robot position in meters - x direction - positive to the right 
+y = uniform(min_distance_wall-H/2,H/2-min_distance_wall)     # robot position in meters - y direction - positive up
+q = 0.0     # robot heading with respect to x-axis in radians 
 
 left_wheel_velocity =  random()   # robot left wheel velocity in radians/s
 right_wheel_velocity =  random()  # robot right wheel velocity in radians/s
@@ -76,7 +75,8 @@ def getLaserScans(resolution=360):
     # fhere we emulate the lidar
     for i in range(resolution+1):
         added_angle = i * ((2*pi)/resolution)
-        current_angle = (q + added_angle) % (2*pi)
+        #Lider turns clockwise
+        current_angle = (q - added_angle) % (2*pi)
         ray = LineString([(x, y), (x+cos(current_angle)*(W+H),(y+sin(current_angle)*(W+H))) ])
         s = world.intersection(ray)
         
@@ -86,8 +86,28 @@ def getLaserScans(resolution=360):
         #here the intersect coords are calculated using the current angle and the measured distance
         x_coord = x + cos(current_angle) * distance
         y_coord = y + sin(current_angle) * distance 
-        full_scan.append((float(x_coord), float(y_coord))) #
+        #full_scan.append((float(x_coord), float(y_coord))) #
+        full_scan.append(distance)
     return full_scan
+
+def laserScanToPosition(scan):
+    min_dist = round(min(scan),3)
+    min_index = np.argmin(scan)
+    print(f'Minimum: Distance: {min_dist}, Index: {min_index}')
+    right_dist = round(scan[(min_index+90)%360],3)
+    print(f'Right: Distance: {right_dist}, Index: {(min_index+90)%360}')
+    left_dist = round(scan[(min_index-90)%360],3)
+    print(f'Left: Distance: {left_dist}, Index: {(min_index-90)%360}')
+    full_side = right_dist + left_dist
+    if (W-0.05 < full_side and full_side < W+0.05):
+        nearest_side = "North/South"
+    else:
+        nearest_side = "West/East"
+    print(nearest_side)
+
+    #We know distance to the nearest wall and wether it is a north/south or a east/west side.
+    #Further, we know the distance to the walls 90 degrees to left and right.
+    #The orientation of the robot can be found by looking at the index zero of the scan and comparing it to the index of the minimum distance to a wall
 
 # Kinematic model
 #################
@@ -173,11 +193,16 @@ for cnt in range(1000):
         # ax.quiver(x, y, cos(q)*0.05, sin(q+0.7)*0.05) #s4
 
         #[ax.plot(x,y, 'bo') for (x,y) in getLaserScans()] 
+        
         plt.draw() 
         plt.pause(0.01) #is necessary for the plot to update for some reason
 
 file.close()
 #[ax.plot(x,y, 'bo') for (x,y) in getLaserScans()] 
+
+laserScanToPosition(getLaserScans())
+
+print(round(x,3),round(y,3))
 ax.plot(x,y, "ro")
 plt.draw()
 plt.show(block=True)
