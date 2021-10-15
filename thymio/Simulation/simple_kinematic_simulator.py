@@ -46,11 +46,12 @@ world = LinearRing([(W/2,H/2),(-W/2,H/2),(-W/2,-H/2),(W/2,-H/2)])
 
 # Variables 
 ###########
-min_distance_wall = 0.07 #in meters
+min_distance_wall = 0.07   #in meters
+resolution = 180           #Angels in one round of the lidar
 
 x = uniform(min_distance_wall-W/2,W/2-min_distance_wall)     # robot position in meters - x direction - positive to the right 
 y = uniform(min_distance_wall-H/2,H/2-min_distance_wall)     # robot position in meters - y direction - positive up
-q = 0.0     # robot heading with respect to x-axis in radians 
+q = uniform(0.0,2*pi)    # robot heading with respect to x-axis in radians 
 
 left_wheel_velocity =  random()   # robot left wheel velocity in radians/s
 right_wheel_velocity =  random()  # robot right wheel velocity in radians/s
@@ -60,16 +61,16 @@ right_wheel_velocity =  random()  # robot right wheel velocity in radians/s
 #initialize belief
 cell_size = 2
 belief = np.array([[1/((Wcm/cell_size)*(Hcm/cell_size))]*int(Wcm/cell_size)]*int(Hcm/cell_size))
-print(belief)
-print(f' Size: {belief.size} \n Width: {belief.size/(Hcm/cell_size)} \n Height: {belief.size/(Wcm/cell_size)}')
-print((sum(sum(belief))))
+#print(belief)
+#print(f' Size: {belief.size} \n Width: {belief.size/(Hcm/cell_size)} \n Height: {belief.size/(Wcm/cell_size)}')
+#print((sum(sum(belief))))
 
 #map
 map = np.array([[0]*int(Wcm/cell_size)]*int(Hcm/cell_size))
 
 # Laser Scan
 ############
-def getLaserScans(resolution=360):
+def getLaserScans():
     full_scan = []
     
     # fhere we emulate the lidar
@@ -93,21 +94,39 @@ def getLaserScans(resolution=360):
 def laserScanToPosition(scan):
     min_dist = round(min(scan),3)
     min_index = np.argmin(scan)
-    print(f'Minimum: Distance: {min_dist}, Index: {min_index}')
-    right_dist = round(scan[(min_index+90)%360],3)
-    print(f'Right: Distance: {right_dist}, Index: {(min_index+90)%360}')
-    left_dist = round(scan[(min_index-90)%360],3)
-    print(f'Left: Distance: {left_dist}, Index: {(min_index-90)%360}')
+    #print(f'Minimum: Distance: {min_dist}, Index: {min_index}')
+    right_dist = round(scan[(min_index+90)%resolution],3)
+    #print(f'Right: Distance: {right_dist}, Index: {(min_index+90)%resolution}')
+    left_dist = round(scan[(min_index-90)%resolution],3)
+    #print(f'Left: Distance: {left_dist}, Index: {(min_index-90)%resolution}')
     full_side = right_dist + left_dist
     if (W-0.05 < full_side and full_side < W+0.05):
         nearest_side = "North/South"
     else:
         nearest_side = "West/East"
-    print(nearest_side)
+    #print(nearest_side)
+    return min_index, min_dist
 
     #We know distance to the nearest wall and wether it is a north/south or a east/west side.
     #Further, we know the distance to the walls 90 degrees to left and right.
     #The orientation of the robot can be found by looking at the index zero of the scan and comparing it to the index of the minimum distance to a wall
+
+def getOrientation():
+    #Check AprilTag
+    #15,0,1 = West
+    #2-6 = North
+    #7-9 = East
+    #10-14 = South
+    print(q)
+    if (-0.5 < q < 0.5):
+        return "East"
+    elif (-0.5*pi-0.5 < q < -0.5*pi+0.5 or 1.5*pi-0.5 < q < 1.5*pi+0.5):
+        return "South"
+    elif (pi-0.5 < abs(q) < pi+0.5):
+        return "West"
+    elif (0.5*pi-0.5 < q < 0.5*pi+0.5 or -1.5*pi-0.5 < q < -1.5*pi+0.5):
+        return "North"
+    return None
 
 # Kinematic model
 #################
@@ -137,6 +156,7 @@ ax.add_patch( Rectangle((-W/2, -H/2),
                         fc ='none', 
                         ec ='g',
                         lw = 3) )
+is_position_known = False
 
 for cnt in range(1000):
     #simple single-ray sensor
@@ -157,19 +177,33 @@ for cnt in range(1000):
     s4_dist = sqrt((s4.x-x)**2+(s4.y-y)**2)                    # distance to wall
     
     #simple controller - change direction of wheels every 10 seconds (100*robot_timestep) unless close to wall then turn on spot
-    if (s2_dist < min_distance_wall):
-        left_wheel_velocity = random()
-        right_wheel_velocity = -random()
-    elif (s0_dist < min_distance_wall or s1_dist < min_distance_wall):
-        left_wheel_velocity = 0.5
-        right_wheel_velocity = -0.5
-    elif (s3_dist < min_distance_wall or s4_dist < min_distance_wall):
-        left_wheel_velocity = -0.5
-        right_wheel_velocity = 0.5
-    else:                
-        if cnt%100==0:
-            left_wheel_velocity = random()
-            right_wheel_velocity = random()
+    if not is_position_known:
+        min_index, min_dist = laserScanToPosition(getLaserScans())
+        if(min_index>0):
+            left_wheel_velocity = 0.5
+            right_wheel_velocity = -0.5
+        else:
+            left_wheel_velocity = -0.5
+            right_wheel_velocity = -0.5
+            orientation = getOrientation()
+            if not orientation is None:
+                print(orientation)
+                is_position_known = True
+    else:
+        break  
+    # if (s2_dist < min_distance_wall):
+    #     left_wheel_velocity = random()
+    #     right_wheel_velocity = -random()
+    # elif (s0_dist < min_distance_wall or s1_dist < min_distance_wall):
+    #     left_wheel_velocity = 0.5
+    #     right_wheel_velocity = -0.5
+    # elif (s3_dist < min_distance_wall or s4_dist < min_distance_wall):
+    #     left_wheel_velocity = -0.5
+    #     right_wheel_velocity = 0.5
+    # else:                
+    #     if cnt%100==0:
+    #         left_wheel_velocity = random()
+    #         right_wheel_velocity = random()
         
     #step simulation
     simulationstep()
@@ -204,6 +238,7 @@ laserScanToPosition(getLaserScans())
 
 print(round(x,3),round(y,3))
 ax.plot(x,y, "ro")
+ax.quiver(x, y, cos(q)*0.05, sin(q)*0.05, width=0.005)
 plt.draw()
 plt.show(block=True)
 
