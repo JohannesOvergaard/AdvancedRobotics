@@ -63,7 +63,7 @@ def detect_color():
         avg_color_per_row = np.average(res, axis=0)
         avg_color = np.average(avg_color_per_row, axis=0)
         readings.append(avg_color)
-        #cv2.imwrite('out'+str(count)+'.png', res)
+        cv2.imwrite('out'+str(count)+'.png', res)
         
     averages = []
     #simplistic approach: the category for which the average of the rgb value is greatest is the one we have detected.
