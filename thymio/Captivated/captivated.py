@@ -62,130 +62,110 @@ def set_up():
     global x,y, theta, pos
     sleep(15) #wait for lidarScan on background thread
     punish_zeros()
-    index = np.argmin(scan_data)
+    min_index = np.argmin(scan_data)
     #find min dist and the left and right walls
-    min_dist = scan_data[index]
-    inv_min_dist = scan_data[(index+180)%359]
-    right = scan_data[(index+90)%359]
-    left = scan_data[abs(index-90)%359]
-    print(f"index: {index}, min_dist: {min_dist}, left: {left}, right: {right}")
+    min_dist = scan_data[min_index]
+    inv_min_dist = scan_data[(min_index+180)%359]
+    right = scan_data[(min_index+90)%359]
+    left = scan_data[(min_index+270)%359]
+    print(f"index: {min_index}, min_dist: {min_dist}, left: {left}, right: {right}")
     #determine quadrant
     findAprilTag()
-    april_to_wall_translation(left, right, min_dist, inv_min_dist)
-    find_theta(min_dist)
+    closest_wall = april_to_wall_translation(min_dist, inv_min_dist, min_index)
+    find_theta(closest_wall, min_index)
+    find_position(closest_wall,left,right,min_dist)
     print(f"x: {x}, y: {y}, theta: {theta}")
     sys.exit()
 
-def find_theta(min_dist):
-    forward = scan_data[179] #straight ahead
-    #TODO: START HERE FIX THIS
+def find_theta(closest_wall, min_index):
+    global theta
+    if (closest_wall == "north"):
+        print (f'closest wall: {closest_wall}')
+        theta = (360-min_index+180)%359
+    elif (closest_wall == "east"):
+        print (f'closest wall: {closest_wall}')
+        theta = (360-min_index+270)%359
+    elif (closest_wall == "south"):
+        print (f'closest wall: {closest_wall}')
+        theta = (360-min_index)%359
+    elif (closest_wall == "west"):
+        print (f'closest wall: {closest_wall}')
+        theta = (360-min_index+90)%359
 
-def april_to_wall_translation(left, right, min_dist, inv_min_dist):
+def find_position(closest_wall, left, right, min_dist):
     global x,y
+    if (closest_wall == "north"):
+        x = left
+        y = H - min_dist
+    elif (closest_wall == "east"):
+        x = W - min_dist
+        y = right
+    elif (closest_wall == "south"):
+        x = right
+        y = min_dist  
+    elif (closest_wall == "west"):
+        x = min_dist
+        y = left
+
+def april_to_wall_translation(min_dist, inv_min_dist, min_index):
     if (not apriltags):
         sys.exit()
     april = apriltags[0].tag_id
     print(april)
-    forward = scan_data[179]
-    backward = scan_data[0]
     if (min_dist + inv_min_dist <= H):
         print("LONG WALL")
         #min_dist is to a long wall
         if april in NORTH:
-            if (forward > backward):
-                print("april north, forward > backward")
-            #lower 
-                x = right
-                y = H - min_dist
+            if (90 < min_index < 270):
+                return "north"
             else:
-                print("april north, forward < backward")
-            #upper
-                x = left
-                y = H - min_dist
+                return "south"
         if april in EAST:
-            if (forward > backward):
-                print("april east, forward > backward")
-            #upper 
-                x = right
-                y = H - min_dist
+            if (min_dist <= 179):
+                return "north"
             else:
-                print("april east, forward < backward")
-            #lower
-                x = right
-                y = min_dist
+                return "south"
         if april in SOUTH:
-            if (forward > backward):
-                print("april south, forward > backward")
-            #upper
-                x = left
-                y = H - min_dist
-            else: 
-                print("april south, forward < backward")
-                x = right
-                y = min_dist
-        if april in WEST:
-            #lower
-            if (forward > backward):
-                print("april west, forward > backward")
-                x = left
-                y = H - min_dist
+            if (min_index < 89 or 270 < min_index):
+                return "north"
             else:
-                print("april west, forward < backward")
-                x = right
-                y = H - min_dist
+                return "south"
+        if april in WEST:
+            if (min_index >= 180):
+                return "north"
+            else:
+                return "south"
     else: 
         #min_dist is to a short wall
         print("SHORT WALL")
         if april in NORTH:
-            if (forward > backward):
-                print("april north, forward > backward")
-            #lower 
-                x = min_dist
-                y = right
+            if (min_index <= 179):
+                return "west"
             else:
-                print("april north, forward < backward")
-            #upper
-                x = W - min_dist
-                y = left
+                return "east"
         if april in EAST:
-            if (forward > backward):
-                print("april east, forward > backward")
-            #upper 
-                x = min_dist
-                y = left
+            if (min_index < 89 or 270 < min_index):
+                return "west"
             else:
-                print("april east, forward < backward")
-            #lower
-                x = W - min_dist 
-                y = right
+                return "east"
         if april in SOUTH:
-            if (forward > backward):
-                print("april south, forward > backward")
-            #upper
-                x = H - min_dist
-                y = right
-            else: 
-                print("april south, forward < backward")
-                x = W - min_dist
-                y = right
-        if april in WEST:
-            #lower
-            if (forward > backward):
-                print("april west, forward > backward")
-                x = W - min_dist
-                y = left
+            if (min_index >= 180):
+                return "west"
             else:
-                print("april west, forward < backward")
-                x = H - min_dist
-                y = left
-             
-
+                return "east"
+        if april in WEST:
+            if (90 < min_index < 270):
+                return "west"
+            else:
+                return "east"
 
 def lidarScan():
     global scan_data
     print("Starting background lidar scanning")
     for scan in lidar.iter_scans():
         if(exit_now):
+            lidar.stop()
+            lidar.disconnect()
             return
         for (_, angle, distance) in scan:
             scan_data[min([359, floor(angle)])] = distance
