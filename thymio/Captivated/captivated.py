@@ -5,6 +5,7 @@ import os
 os.system("(asebamedulla ser:name=Thymio-II &) && sleep 0.3")
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 from time import sleep
 import random
 import cv2
@@ -43,10 +44,19 @@ NORTH = [2, 3, 4, 5, 6]
 EAST = [7, 8, 9]
 SOUTH = [10, 11, 12, 13, 14]
 WEST = [15, 0, 1]
+
 #World dimensions in mm, the superior SI unit:
 H = 1140
 W = 1920
 
+cell_size = 60
+
+#print(belief)
+#print(f' Size: {belief.size} \n Width: {belief.size/(Hcm/cell_size)} \n Height: {belief.size/(Wcm/cell_size)}')
+#print((sum(sum(belief))))
+
+#World
+world = np.array([[0]*int(W/cell_size)]*int(H/cell_size))
 
 
 #NOTE: if you get adafruit_rplidar.RPLidarException: Incorrect descriptor starting bytes
@@ -75,7 +85,7 @@ def set_up():
     find_theta(closest_wall, min_index)
     find_position(closest_wall,left,right,min_dist)
     print(f"x: {x}, y: {y}, theta: {theta}")
-    sys.exit()
+    #sys.exit()
 
 def find_theta(closest_wall, min_index):
     global theta
@@ -109,7 +119,7 @@ def find_position(closest_wall, left, right, min_dist):
 
 def april_to_wall_translation(min_dist, inv_min_dist, min_index):
     if (not apriltags):
-        sys.exit()
+        return "None"
     april = apriltags[0].tag_id
     print(april)
     if (min_dist + inv_min_dist <= H):
@@ -173,23 +183,77 @@ def lidarScan():
 scanner_thread = Thread(target=lidarScan)
 scanner_thread.daemon = True
 scanner_thread.start()
-
 sleep(1)
+
+# Create thread to update world
+def UpdateWorld(light_sensor_values): # Index 0 = left      Index 1 = right
+    global world
+    # Take snapshot of current Lidar readings
+    current_scan = scan_data[:]
+
+    # Calculate estimated pos from snapshot data
+    min_index = np.argmin(current_scan)
+
+    #find min dist and the left and right walls
+    min_dist = current_scan[min_index]
+    inv_min_dist = current_scan[(min_index+180)%359]
+    right = current_scan[(min_index+90)%359]
+    left = current_scan[(min_index+270)%359]
+
+    #determine quadrant
+    findAprilTag()
+    closest_wall = april_to_wall_translation(min_dist, inv_min_dist, min_index)
+    if (not (closest_wall == 'None')):
+        find_theta(closest_wall, min_index)
+        find_position(closest_wall,left,right,min_dist)
+
+        if (light_sensor_values[0] < 300 or light_sensor_values[1] < 300): # If black tag detected
+            print(f"x: {x} y: {y}")
+            world[int(y/cell_size)-1][int(x/cell_size)-1] = 1
+            # print(f"Update pos thread - x: {int(x)}, y: {int(y)}, theta: {theta}")
+
+# world_thread = Thread(target=UpdateWorld)
+# world_thread.daemon = True
+# sleep(1)
+
+# def livePlotting():
+#     global x, y, theta
+#     sleep(20)
+#     cnt = 0
+#     #Live plotting
+#     fig, ax = plt.subplots(figsize=((W/100)+10, (H/100)+10))
+#     ax.axis([0-0.1, (W/100)+0.1, 0-0.1, (H/100)+0.1])
+#     ax.add_patch( Rectangle((0, 0),
+#                             (W/100), (H/100),
+#                             fc ='none', 
+#                             ec ='g',
+#                             lw = 3))
+#     while not exit_now:
+#         omega = ((2 * pi)/360) * theta
+#         # print(f"Plotting live data x: {x/100} y: {y/100} omega: {omega}...")
+#         ax.quiver((x/100), (y/100), cos(omega)*0.05, sin(omega)*0.05, width=0.005)
+#         plt.draw() 
+#         plt.pause(1.0)
+
+
+# plot_thread = Thread(target=livePlotting)
+# plot_thread.daemon = True
+# plot_thread.start()
+# sleep(1)
 
 def takePhotos():
     global image
     camera.start_preview()
     while not exit_now:
-        print("Camera test")
         sleep(5)
         #we capture to openCV compatible format
         #you might want to increase resolution
         camera.resolution = (IMG_WIDTH, IMG_HEIGHT)
         camera.framerate = 24
-        sleep(2)
         image = np.empty((IMG_HEIGHT, IMG_WIDTH, 3), dtype=np.uint8)
         camera.capture(image, 'bgr')
         image = cv2.rotate(image, cv2.ROTATE_180)
+        # print(f"saving image...")
         cv2.imwrite('out.png', image) 
     camera.stop_preview()
 
@@ -204,21 +268,6 @@ camera_thread = Thread(target=takePhotos)
 camera_thread.daemon = True
 camera_thread.start()
 
-# def lidarScan():
-#     print("Starting background lidar scanning")
-#     test = lidar.iter_scans()
-#     # print(f"Length of scan: {len(test)}")
-#     for scan in test:
-#         if(exit_now):
-#             return
-#         if DEBUG:
-#             print(f"Length of scan: {len(scan)}")
-#         for (_, angle, distance) in scan:
-#             # if DEBUG:
-#             #     print(f"Angle:{angle} Distance:{distance}")
-#             scan_data[min([359, floor(angle)])] = distance
-#     print(finished)
-#     return scan_data
 
 class Thymio:
     def __init__(self):
@@ -314,6 +363,9 @@ class Thymio:
         # dbus errors can be handled here.
         # Currently only the error is logged. Maybe interrupt the mainloop here
         print("dbus error: %s" % str(e))
+        exit_now = True
+        os.system("pkill -n asebamedulla")
+        
 
     #------------------ Sensor val ---------------#
     def convert_sensor_value_to_distance(self, x, sensor_id):
@@ -333,17 +385,14 @@ class Thymio:
 #------------------- loop ------------------------
 
 def mainLoop(robot):
-    global scan_data
+    global x, y, theta, scan_data
     count = 1
     left_wheel_velocity = 0
     right_wheel_velocity = 0 
-    min_distance_wall = 70
-    set_up()
-    while count < 3000:
+    min_distance_wall = 150
+    set_up()                                    # Find global pos
+    while count < 5000:
         prox_val = robot.sens_horizontal()
-        light_sensor_val = robot.sens_vertical()
-        #robot.take_photo(count)
-        #print(scan_data)
         if DEBUG:
             print(f"Left light: {light_sensor_val[0]}   and    Right light: {light_sensor_val[1]}")
 
@@ -352,7 +401,6 @@ def mainLoop(robot):
         s2_dist = robot.convert_sensor_value_to_distance(prox_val[2], "s2")
         s3_dist = robot.convert_sensor_value_to_distance(prox_val[3], "s3")
         s4_dist = robot.convert_sensor_value_to_distance(prox_val[4], "s4")
-
         if (s2_dist < min_distance_wall):
             left_wheel_velocity = random.randrange(200, 400)
             right_wheel_velocity = -random.randrange(200, 400)
@@ -364,21 +412,26 @@ def mainLoop(robot):
             right_wheel_velocity = 200
         else:                
             if count%100==0:
-                left_wheel_velocity = random.randrange(200, 400)
-                right_wheel_velocity = random.randrange(200, 400)
+                left_wheel_velocity = random.randrange(200, 800)
+                right_wheel_velocity = random.randrange(200, 800)
+        
+        if(count % 50 == 0):
+            light_sensor_val = robot.sens_vertical()
+            print(light_sensor_val)
+            UpdateWorld(light_sensor_val)
+            print(world)
 
-        robot.drive(left_wheel_velocity,right_wheel_velocity )
+        robot.drive(left_wheel_velocity,right_wheel_velocity)
         count = count + 1
 
         
     robot.stop()
+    exit_now = True
     
     # robot.drive(200, 200)
 
 
 #----------------- loop end ---------------------
-
-
 
 if __name__ == '__main__':
     try:
@@ -392,9 +445,9 @@ if __name__ == '__main__':
         '''
         mainLoop(robot)
     except:
-        print(f"{sys.exc_info()[0]}: {sys.exc_info()[1]}")
+        print(f"{sys.exc_info()[0]}: {sys.exc_info()[1]} : {sys.exc_info()[2]}")
         print("Stopping robot")
         exit_now = True
-        sleep(1)
+        sleep(5)
         os.system("pkill -n asebamedulla")
         print("asebamodulla killed")
