@@ -1,7 +1,7 @@
 from shapely.geometry import LinearRing, LineString, Point
 from numpy import sin, cos, pi, sqrt
 import numpy as np
-from random import random, uniform
+from random import random, uniform, randint, sample, choice
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
@@ -33,7 +33,7 @@ left_wheel_velocity =  random()   # robot left wheel velocity in radians/s
 right_wheel_velocity =  random()  # robot right wheel velocity in radians/s
 
 #Q-learning
-action_space = np.array([(-1,1),(1,-1),(1,1)], dtype="i,i") #Turn left, turn right, forward
+action_space = np.array([(0,1),(1,1),(1,0)], dtype="i,i") #Turn left, forward, turn right
 state_space = np.array(["OL", "OR", "OF", "NO"]) #OL, OR, OF, NO
 
 epsilon = 1
@@ -41,8 +41,10 @@ decay = 0.999
 lr = 0.95
 gamma = 0.9
 
-GENERATION = np.empty(100, dtype=object)
-FITNESSES = np.empty(100, dtype=object)
+num_generations = 10
+num_individuals = 10
+GENERATION = np.empty(num_individuals, dtype=object)
+FITNESSES = np.empty(num_individuals, dtype=object)
 
 
 def generate_genome():
@@ -50,18 +52,17 @@ def generate_genome():
 
 def generate_init_pop():
     global GENERATION
-    for i in range(100):
+    for i in range(num_individuals):
         GENERATION[i] = generate_genome()
 
 def generate_new_generation(best):
     global GENERATION
-    for i in range(len(GENERATION)):
-        if not i in best:
-            GENERATION[i] = generate_genome()
-        
+    not_best = set(range(0, num_individuals))-best
+    for i in not_best:
+        GENERATION[i] = mutation(GENERATION[choice(tuple(best))])
 
 def evaluate_genome(i):
-    global x, y, z, left_wheel_velocity, right_wheel_velocity, FITNESSES
+    global x, y, q, left_wheel_velocity, right_wheel_velocity, FITNESSES
     genome = GENERATION[i]
     state = setup()
 
@@ -73,7 +74,7 @@ def evaluate_genome(i):
     right_wheel_velocity =  random()  # robot right wheel velocity in radians/s
 
     fitness = 0
-    for cnt in range(500): #evaluation time for a single individual
+    for cnt in range(1000): #evaluation time for a single individual
         action = get_max_action(state, genome)
         (new_state, reward) = do_action(state, action)
         fitness += reward
@@ -82,9 +83,16 @@ def evaluate_genome(i):
 
 def selection():
     global FITNESSES
-    return set(np.argpartition(FITNESSES, -20)[-20:]) #20 best fitnesses
+    return set(np.argpartition(FITNESSES, -2)[-2:]) # best fitnesses
 
-
+def mutation(genome):
+    i = randint(0,len(state_space)-1)
+    j = randint(0,len(action_space)-1)
+    if (uniform(0.0,1.0) < 0.8):
+        genome[i,j] = genome[i,j]*1.1
+    else:
+        genome = generate_genome()
+    return genome
 
 # Kinematic model
 #################
@@ -186,9 +194,9 @@ def do_action(state, action):
     return (new_state, reward)
 
 def get_reward(state, action):
-    i = 0
+    i = 1
     a = np.where(action_space == action)
-    if (a[0][0] == 2):  #Motivation to drive forward
+    if (a[0][0] == 1):  #Motivation to drive forward
         i = 5
     if (state == "NO"):
         return i
@@ -213,6 +221,12 @@ def get_reward(state, action):
 # Simulation loop
 #################
 def visualize_simulation_of_genome(index):
+    global x,y,q
+
+    x = uniform(min_distance_wall,W-min_distance_wall)     # robot position in meters - x direction - positive to the right 
+    y = uniform(min_distance_wall,H-min_distance_wall)     # robot position in meters - y direction - positive up
+    q = uniform(0.0,2*pi)    # robot heading with respect to x-axis in radians 
+
     state = setup()
     genome = GENERATION[index]
     cm = 1/2.54
@@ -235,14 +249,28 @@ def visualize_simulation_of_genome(index):
             plt.pause(0.01) #is necessary for the plot to update for some reason
     plt.show(block=True)
     
+min_fitness  = list(range(num_generations))
+avg_fitness = list(range(num_generations))
+max_fitness = list(range(num_generations))
+xpoints = list(range(0,num_generations))
 
 generate_init_pop()
-for j in range(5): #generations
+for j in range(num_generations): #generations
     for i in range(len(GENERATION)):
         evaluate_genome(i)
     print(FITNESSES)
+    min_fitness[j] = np.amin(FITNESSES)
+    avg_fitness[j] = np.average(FITNESSES)
+    max_fitness[j] = np.amax(FITNESSES)
+
     best = selection()
     generate_new_generation(best)
+    
 ind = np.argmax(FITNESSES)
-visualize_simulation_of_genome(ind)
 print(GENERATION[ind])
+visualize_simulation_of_genome(ind)
+
+plt.plot(xpoints,min_fitness,"ro")
+plt.plot(xpoints,avg_fitness,"bo")
+plt.plot(xpoints,max_fitness,"go")
+plt.show(block=True)
