@@ -143,7 +143,7 @@ def write_data(writer, row):
     writer.writerow(row)
 
 def mainLoop(robot):
-    f = open('path/to/csv_file', 'w')
+    f = open('./data.csv', 'w')
     writer = csv.writer(f)
     time_step = 10000
     while (time_step > 0):
