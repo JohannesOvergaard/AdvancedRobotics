@@ -3,7 +3,7 @@
 #from picamera import PiCamera
 import cv2
 import numpy as np
-
+import sys
 #initialize
 
 #camera = PiCamera()
@@ -26,30 +26,32 @@ import numpy as np
 
 #boundaries defined in HSV format.
 boundaries = [
-    ([0, 100, 50], [10, 255, 200]), # red
-    ([30, 100, 50], [90, 255, 200]), # green
-    ([70, 100, 50], [100, 255, 200]), # blue
-    ([20, 100, 50], [30, 255, 200]) # yellow
+    ([340, 70, 50], [359, 100, 100]), # red
+    ([90, 70, 40], [130, 100, 100]), # green
+    ([220, 50, 50], [250, 100, 100]), # blue 
+    ([290, 50, 50], [310, 100, 100]), # purple 
+    ([45, 50, 40], [60, 100, 100]) # yellow/orange 
 ]
 
 readings = []
 
-def detect_color():
+def detect_color(image):
     '''camera.resolution(240,240)
     camera.framerare = 24
     camera.start_preview()
     sleep(2)
     image = np.empty((240, 240, 3), dtype=np.uint8)
     camera.capture(image, 'bgr')'''
-    image = cv2.imread('./yellow.jpg')
+    image = cv2.imread(image)
     
     count = 0
     # Apply blurs to remove unnecessary details from image.
     blur = cv2.blur(image, (5,5))
-    blur0 = cv2.medianBlur(blur, 5)
+    cv2.imwrite('out_blur.png', blur)
+    #blur0 = cv2.medianBlur(blur, 5)
 
     #We prefer hsv color space, gives more accurate reading of each pixel - easier to define thresholds.
-    hsv_image = cv2.cvtColor(blur0, cv2.COLOR_BGR2HSV) 
+    hsv_image = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV) 
 
     for (lower, upper) in boundaries:
         lower = np.array(lower, dtype=np.uint8)
@@ -84,4 +86,6 @@ def detect_color():
     if i == 3:
         print("yellow")
 
-detect_color()
+a = sys.argv[1]
+print(a)
+detect_color(str(a))
