@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from time import sleep
+from random import random, uniform
 import random
 import cv2
 import sys
@@ -15,8 +16,115 @@ from math import cos, sin, pi, floor
 import dbus.mainloop.glib
 from adafruit_rplidar import RPLidar
 from threading import Thread
-from picamera import PiCamera
 import apriltag
+import ecamera
+
+# Environment parameters 
+H = 1120
+W = 1920
+Diagonal = 2233
+
+
+#Q-learning
+SPEED = 800
+action_space = np.array([(SPEED,SPEED),(SPEED,0),(SPEED,-SPEED),(-SPEED,0),(-SPEED,-SPEED),(0,-SPEED),(-SPEED,SPEED),(0,SPEED),(0,0)], dtype="i,i")
+state_space = np.array(["OL", "OR", "OF", "OB", "NO"]) #OL, OR, OF, OB, NO
+
+Q = np.array(
+[[ 20. , 0., 0. , 0., 0., 0., 10., 30., 0. ],
+ [ 20., 30., 10., 0., 0., 0., 0., 0., 0.],
+ [ 50., 0., 0., 0., 0., 0., 0., 0., 0.],
+ [ 0. ,0. , 0. ,0. ,0. ,0.  ,0. , 0.  , 0. ],
+ [10., 25., 20., 0., 0., 0., 20., 25.,  0.]])
+print (Q)
+
+epsilon = 0
+decay = 1
+lr = 0.95
+gamma = 0.9
+min_distance_wall = 100
+
+def convert_sensor_values_to_distance(robot, prox_val):
+    s0_dist = robot.convert_a_sensor_value_to_distance(prox_val[0], "s0")
+    s1_dist = robot.convert_a_sensor_value_to_distance(prox_val[1], "s1")
+    s2_dist = robot.convert_a_sensor_value_to_distance(prox_val[2], "s2")
+    s3_dist = robot.convert_a_sensor_value_to_distance(prox_val[3], "s3")
+    s4_dist = robot.convert_a_sensor_value_to_distance(prox_val[4], "s4")
+    s5_dist = robot.convert_a_sensor_value_to_distance(prox_val[5], "s5")
+    s6_dist = robot.convert_a_sensor_value_to_distance(prox_val[6], "s6")
+    return [s0_dist, s1_dist, s2_dist, s3_dist, s4_dist, s5_dist, s6_dist]
+
+def sensor_to_state(sensor_values, colour, direction):
+    min_dist = min(sensor_values)
+
+    # Check if avoider is visible to camera (blue most prominent colour detected camera)
+    if (colour == "BLUE"):
+        print("I see a target!")
+        if (direction == "LEFT"):
+            return state_space[0]
+        elif (direction == "RIGHT"):
+            return state_space[1]
+        elif (direction == "CENTER"):
+            return state_space[2]
+        return state_space[4]   
+
+    elif (min_dist < min_distance_wall): # If no colour, use horizontal IR sensors to determine state
+        sensor_index = sensor_values.index(min_dist)
+        if (sensor_index == 0 or sensor_index == 1): # LEFT
+            return state_space[0]
+        elif (sensor_index == 3 or sensor_index == 4): # RIGHT
+            return state_space[1]
+        elif (sensor_index == 2):
+            return state_space[2] # CENTER
+        elif (sensor_index == 5 or sensor_index == 6): # BACK
+            return state_space[3]       
+    else:
+        return state_space[4]
+
+def explore_or_exploit(state):
+    global epsilon
+    epsilon = epsilon*decay
+    if (uniform(0,1) < epsilon):  #Explore
+        return np.random.choice(action_space)
+    else:                           
+        return get_max_action(state)    #Exploit
+
+def get_max_action(state):
+    s = np.where(state_space == state)[0][0]
+    a = np.argmax(Q[s,:])
+    return action_space[a]
+
+def updateQ(state, action, reward, new_state):
+    global Q
+    s = np.where(state_space == state)
+    a = np.where(action_space == action)
+    ns = np.where(state_space == new_state)
+    Q[s,a] = Q[s,a] + lr * (reward + gamma * np.max(Q[ns,:]) - Q[s,a])
+    #print (Q)
+
+def do_action(robot, state, colour, direction, action):
+    left_wheel_velocity, right_wheel_velocity = action
+    robot.drive(left_wheel_velocity,right_wheel_velocity)
+    sleep(0.05)
+    prox_val = robot.sens_horizontal() # New proximity values
+
+    # Convert to dist
+    new_state = sensor_to_state(convert_sensor_values_to_distance(robot, prox_val), colour, direction)
+    reward = get_reward(state, action)
+
+    updateQ(state,action,reward,new_state)
+
+    return new_state
+
+def get_reward(state, action):
+    i = 1
+    a = np.where(action_space == action)
+    if (a[0][0] in [0, 1, 7]):  #Motivation to drive forward
+        i += 5
+    if (state == "NO" or state == "OB"): # Penalty for not having visible avoider
+        return -1
+    else: # Reward for visible avoider
+        return i+5
 
 class Thymio:
     def __init__(self):
@@ -46,7 +154,7 @@ class Thymio:
         self.aseba.SendEventName("motor.target", [left_wheel, right_wheel])
 
     def sens(self):
-        while True:
+        # while True:
             prox_horizontal = self.aseba.GetVariable("thymio-II", "prox.horizontal")
             print("Sensing:")
             print(prox_horizontal[0])
@@ -100,7 +208,7 @@ class Thymio:
         exit_now = True
         os.system("pkill -n asebamedulla")
 
-    def convert_sensor_value_to_distance(self, x, sensor_id):
+    def convert_a_sensor_value_to_distance(self, x, sensor_id):
         if sensor_id == "s0":
             return 0.000000000802*pow(x, 3) - 0.00000706*pow(x, 2) - 0.0163*x+165
         elif sensor_id == "s1":
@@ -111,7 +219,11 @@ class Thymio:
             return 0.00000000223*pow(x, 3) - 0.000019*pow(x, 2) + 0.00662*x + 175
         elif sensor_id == "s4":
             return 0.00000000199*pow(x, 3) - 0.0000174*pow(x, 2) + 0.0062*x + 170
-    
+        elif sensor_id == "s5":
+            return 0.00000000223*pow(x, 3) - 0.000019*pow(x, 2) + 0.00662*x + 175
+        elif sensor_id == "s6":
+            return 0.00000000199*pow(x, 3) - 0.0000174*pow(x, 2) + 0.0062*x + 170
+
     def sendInformation(self, number):
         self.aseba.SendEventName("prox.comm.tx", [number])
 
@@ -119,14 +231,25 @@ class Thymio:
         rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")
         return rx[0]
 
+    def disableComms(self):
+        self.aseba.SendEventName("prox.comm.enable", [0])
+
+    def enableComms(self):
+        self.aseba.SendEventName("prox.comm.enable", [1])
+        
+    def restartCommunication(self):
+        if self.receiveInformation() != 0:
+            self.disableComms()
+            self.enableComms()
+
     def glow(self, colour):
         rgb = [0,0,0]
-        if (colour == "orange"):
-            rgb = [32, 10, 0]
+        if (colour == "yellow"):
+            rgb = [32, 32, 0]
         if (colour == "red"):
             rgb = [32, 0, 0]
         if (colour == "purple"):
-            rgb = [16, 0, 32]
+            rgb = [32, 0, 32]
         if (colour == "green"):
             rgb = [0, 32, 0]
         if (colour == "blue"):
@@ -135,36 +258,67 @@ class Thymio:
         self.aseba.SendEventName("leds.bottom.left", rgb)
         self.aseba.SendEventName("leds.bottom.right", rgb)
         
-        
-            
+def ground_sensor_to_action(left_sensor, right_sensor):
+    if (left_sensor < 200 and right_sensor > 250):   
+        return action_space[5] # REVERSE-LEFT action
+    elif(left_sensor > 250 and right_sensor < 200):
+        return action_space[3] # REVERSE-RIGHT action
+    else:
+        if (uniform(0,1) < 0.5):  #Explore
+            return action_space[5] # REVERSE-LEFT action
+        else:
+            return action_space[3] # REVERSE-RIGHT action
+
 
 def mainLoop(robot):
-    while (True):
-        #robot.sendInformation(1)
-        #print(robot.receiveInformation())
-        colours = ["orange", "red", "green", "purple", "blue"]
-        for i in colours:
-            robot.glow(i)
-            sleep(5)
-        # robot.resetMessage()
+    count = 1
+    left_wheel_velocity = 0
+    right_wheel_velocity = 0 
+    robot.glow("red")
+    # Get initial sensor values
+    img = ecamera.capture()
+    colour, direction = ecamera.detect_color_and_direction(img)
+    state = sensor_to_state(convert_sensor_values_to_distance(robot, robot.sens_horizontal()), colour, direction)
 
+    while True:
+        count += 1
+        robot.glow("red")
+        robot.sendInformation(1)
+        img = ecamera.capture()
+        colour, direction = ecamera.detect_color_and_direction(img)
+        left_sensor, right_sensor = robot.sens_vertical()
+        action = ""
+
+        if (left_sensor < 200 or right_sensor < 200): # Black tape 
+            action = ground_sensor_to_action(left_sensor, right_sensor)
+            robot.drive(action[0], action[1])
+            state = sensor_to_state(convert_sensor_values_to_distance(robot, robot.sens_horizontal()), colour, direction)
+        elif (left_sensor < 500 and right_sensor < 500): # Grey tape 
+            robot.glow("yellow")
+            robot.drive(SPEED, SPEED)
+            sleep(2)
+        else: # White tape 
+            action = explore_or_exploit(state)
+            print(f"State: {state} Detected colour: {colour}  Direction: {direction} Action: {action}")
+            state = do_action(robot, state, colour, direction,  action)
+
+    robot.stop()
+    print(Q)
+    os.system("pkill -n asebamedulla")
 
 if __name__ == '__main__':
     try:
         robot = Thymio()
-
-        #robot.sens() 
-        '''
-        thread = Thread(target=robot.sens)
-        thread.daemon = True
-        thread.start()
-        '''
         mainLoop(robot)
+        
     except:
         print(f"{sys.exc_info()[0]}: {sys.exc_info()[1]} : {sys.exc_info()[2]}")
         print("Stopping robot")
         exit_now = True
-        sleep(5)
+        sleep(3)
         os.system("pkill -n asebamedulla")
         print("asebamodulla killed")
+
+
+
 
